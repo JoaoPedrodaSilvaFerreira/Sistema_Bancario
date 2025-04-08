@@ -117,7 +117,8 @@ class Banco:
                         "extrato": [],
                         "saques_realizados": 0,
                         "limite_saques": 3,
-                        "limite_por_saque": 500
+                        "limite_por_saque": 500,
+                        "limite_transacao_diaria": 0
                     }
                     self.contas.append(nova_conta)    
                     print('Conta criada com sucesso.')
@@ -142,12 +143,22 @@ class Banco:
                 "extrato": [],
                 "saques_realizados": 0,
                 "limite_saques": 3,
-                "limite_por_saque": 500
+                "limite_por_saque": 500,
+                "limite_transacao_diaria": 0
             }
             self.contas.append(nova_conta)    
-            print('Conta criada com sucesso.')    
-            input('Aperte qualquer tecla para voltar.')    
-            return                  
+            print('Conta criada com sucesso.')                    
+   
+    def resete_limite_diario(self,conta):
+        if not conta['extrato']:  # Se o extrato estiver vazio, não faz nada
+            return
+    
+        # Pega a data da última transação (último item da lista)
+        ultima_data = conta['extrato'][-1][2]  
+    
+        if ultima_data.date() != datetime.now().date():
+            conta['limite_transacao_diaria'] = 0  
+            conta['saques_realizados'] = 0
 
     def selecionar_conta(self, cpf):
         contas_usuario = [c for c in self.contas if c["usuario"]["cpf"] == cpf]
@@ -175,15 +186,22 @@ class Banco:
 
     def depositar(self, conta):  
         limpar_terminal()
+        self.resete_limite_diario(conta)
         print('======= DEPÓSITO =======')
+        
+        if conta['limite_transacao_diaria'] >= 10:
+            print('Você atingiu o limite maximo de transações diarias')
+            input('Aperte qualquer tecla para continuar.')
+            return
         try:
             deposito = float(input('Digite o valor que sera depositado: R$ ')) 
             if deposito <= 0:
                 print('\nNão é possivel depositar um valor igual ou menor que zero.')
                 input('\nAperte qualquer tecla para voltar')
                 return 
-
+            
             conta['saldo'] += deposito
+            conta["limite_transacao_diaria"] += 1 
             conta[ 'extrato'].append(('depósito', deposito,datetime.now()))
             print('\nDepósito realizado com sucesso!')
 
@@ -194,14 +212,19 @@ class Banco:
     
     def sacar(self,conta): 
         limpar_terminal()
+        self.resete_limite_diario(conta)
         print('======= SAQUE =======')
-        print('Valor maximo de saque R$500,00. Com limite de 3 saques diários.')
-        print(f'Saques diarios realizados {conta['saques_realizados']}/{conta['limite_saques']}')
-        try:
-            if conta['saldo'] <= 0:
+        if conta['saldo'] <= 0:
                 print('Saldo insuficiente para tentativa.')
                 input('Aperte qualquer tecla para continuar.')
                 return
+        if conta['limite_transacao_diaria'] >= 10:
+                print('Você atingiu o limite maximo de transações diarias')
+                input('Aperte qualquer tecla para continuar.')
+                return
+        print('Valor maximo de saque R$500,00. Com limite de 3 saques diários.')
+        print(f'Saques diarios realizados {conta['saques_realizados']}/{conta['limite_saques']}')
+        try:
             if conta["saques_realizados"] >= conta["limite_saques"]:
                 print("\nLimite diário de saques atingido.")
             saque = float(input("Valor do saque: R$ "))
@@ -216,6 +239,7 @@ class Banco:
             else:
                 conta["saldo"] -= saque
                 conta["saques_realizados"] += 1
+                conta["limite_transacao_diaria"] += 1 
                 conta["extrato"].append(("Saque", -saque, datetime.now()))
                 print('Retire as notas na boca do caixa.')
                 sleep(2)
@@ -229,7 +253,7 @@ class Banco:
 
     def visualizar_extrato(self,conta):
         limpar_terminal()
-        limpar_terminal()
+        self.resete_limite_diario(conta)
         print(f"\n=== EXTRATO BANCÁRIO ===")
         print(f"Agência: {conta['agencia']} Conta: {conta['numero']}")
         print(f"Cliente: {conta['usuario']['nome']}")
@@ -303,7 +327,11 @@ CPF:     {conta['usuario']['cpf']}
                     self.Cadastrar_Usuario()
                 
                 else:
+                    limpar_terminal()
                     print('Opção inválida.')
+                    input('\nAperte qualquer tecla para voltar')
+                    continue
+                
             except ValueError:
                 print('Operação inválida. Tente novamente.')   
                 input('\nAperte qualquer tecla para voltar')
